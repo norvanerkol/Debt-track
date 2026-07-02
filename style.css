@@ -55,7 +55,8 @@ body {
 
 .summary {
   display: flex;
-  gap: 1.5rem;
+  flex-wrap: wrap;
+  gap: 1rem 1.5rem;
   font-size: 0.9rem;
 }
 
@@ -71,6 +72,27 @@ body {
 
 .summary .value.positive { color: var(--positive); font-weight: 600; }
 .summary .value.negative { color: var(--negative); font-weight: 600; }
+
+.currency-group {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  padding-right: 1.25rem;
+  border-right: 1px solid var(--border);
+}
+
+.currency-group:last-child {
+  padding-right: 0;
+  border-right: none;
+}
+
+.currency-code {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  align-self: flex-start;
+}
 
 main {
   display: grid;
@@ -147,7 +169,7 @@ main {
 .person-item {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   padding: 0.6rem 0.7rem;
   border-radius: 8px;
   cursor: pointer;
@@ -162,6 +184,13 @@ main {
 }
 
 .person-item .name { font-weight: 500; }
+
+.balance-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.15rem;
+}
 
 .person-item .balance {
   font-size: 0.85rem;
@@ -186,6 +215,9 @@ main {
   background: var(--bg);
   margin-bottom: 1rem;
   font-size: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
 }
 
 .balance-box .amount.positive { color: var(--positive); font-weight: 700; }

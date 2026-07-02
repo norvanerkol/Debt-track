@@ -1,7 +1,15 @@
 (() => {
   const STORAGE_KEY = 'debt-track:data';
 
-  /** @typedef {{id:string,date:string,kind:'debt'|'payment',direction:'they_owe_me'|'i_owe_them',amount:number,note:string}} Entry */
+  const CURRENCIES = [
+    { code: 'USD', symbol: '$', label: 'USD ($)' },
+    { code: 'EUR', symbol: '€', label: 'EUR (€)' },
+    { code: 'TRY', symbol: '₺', label: 'TRY (₺)' },
+  ];
+  const DEFAULT_CURRENCY = CURRENCIES[0].code;
+  const CURRENCY_SYMBOL = Object.fromEntries(CURRENCIES.map(c => [c.code, c.symbol]));
+
+  /** @typedef {{id:string,date:string,kind:'debt'|'payment',direction:'they_owe_me'|'i_owe_them',amount:number,currency:string,note:string}} Entry */
   /** @typedef {{id:string,name:string,entries:Entry[]}} Person */
 
   function loadData() {
@@ -10,6 +18,11 @@
       if (!raw) return { people: [] };
       const parsed = JSON.parse(raw);
       if (!parsed || !Array.isArray(parsed.people)) return { people: [] };
+      for (const person of parsed.people) {
+        for (const entry of person.entries || []) {
+          if (!entry.currency) entry.currency = DEFAULT_CURRENCY;
+        }
+      }
       return parsed;
     } catch {
       return { people: [] };
@@ -34,13 +47,24 @@
     return sign * kindSign * entry.amount;
   }
 
-  function personBalance(person) {
-    return person.entries.reduce((sum, e) => sum + entryDelta(e), 0);
+  /** currency code -> net balance, only for currencies that appear in the person's entries */
+  function personBalancesByCurrency(person) {
+    const balances = {};
+    for (const e of person.entries) {
+      balances[e.currency] = (balances[e.currency] || 0) + entryDelta(e);
+    }
+    return balances;
   }
 
-  function fmtMoney(n) {
+  function currenciesUsed(person) {
+    const used = new Set(person.entries.map(e => e.currency));
+    return CURRENCIES.filter(c => used.has(c.code));
+  }
+
+  function fmtMoney(n, currency) {
     const abs = Math.abs(n);
-    return abs.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const symbol = CURRENCY_SYMBOL[currency] || '';
+    return `${symbol}${abs.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   }
 
   function balanceClass(n) {
@@ -49,10 +73,10 @@
     return 'zero';
   }
 
-  function balanceText(n, who) {
-    if (Math.abs(n) < 0.005) return 'Settled up';
-    if (n > 0) return `${who} owes you $${fmtMoney(n)}`;
-    return `You owe ${who} $${fmtMoney(n)}`;
+  function balanceText(n, currency, who) {
+    if (Math.abs(n) < 0.005) return `Settled up in ${currency}`;
+    if (n > 0) return `${who} owes you ${fmtMoney(n, currency)}`;
+    return `You owe ${who} ${fmtMoney(n, currency)}`;
   }
 
   const state = {
@@ -73,6 +97,7 @@
     deletePersonBtn: document.getElementById('delete-person-btn'),
     entryDirection: document.getElementById('entry-direction'),
     entryAmount: document.getElementById('entry-amount'),
+    entryCurrency: document.getElementById('entry-currency'),
     entryNote: document.getElementById('entry-note'),
     entryDate: document.getElementById('entry-date'),
     addEntryBtn: document.getElementById('add-entry-btn'),
@@ -105,28 +130,41 @@
   }
 
   function renderSummary() {
-    let theyOweMe = 0;
-    let iOweThem = 0;
+    const totals = {}; // currency -> { theyOweMe, iOweThem }
     for (const p of state.data.people) {
-      const bal = personBalance(p);
-      if (bal > 0) theyOweMe += bal;
-      else iOweThem += -bal;
+      const balances = personBalancesByCurrency(p);
+      for (const [currency, bal] of Object.entries(balances)) {
+        const t = totals[currency] || (totals[currency] = { theyOweMe: 0, iOweThem: 0 });
+        if (bal > 0) t.theyOweMe += bal;
+        else t.iOweThem += -bal;
+      }
     }
-    const net = theyOweMe - iOweThem;
-    el.summary.innerHTML = `
-      <div class="figure">
-        <span class="label">Owed to you</span>
-        <span class="value positive">$${fmtMoney(theyOweMe)}</span>
-      </div>
-      <div class="figure">
-        <span class="label">You owe</span>
-        <span class="value negative">$${fmtMoney(iOweThem)}</span>
-      </div>
-      <div class="figure">
-        <span class="label">Net</span>
-        <span class="value ${balanceClass(net)}">${net >= 0 ? '+' : '-'}$${fmtMoney(net)}</span>
-      </div>
-    `;
+    const usedCurrencies = CURRENCIES.filter(c => totals[c.code]);
+    if (usedCurrencies.length === 0) {
+      el.summary.innerHTML = `<div class="figure"><span class="label">No debts tracked yet</span></div>`;
+      return;
+    }
+    el.summary.innerHTML = usedCurrencies.map(c => {
+      const t = totals[c.code];
+      const net = t.theyOweMe - t.iOweThem;
+      return `
+        <div class="currency-group">
+          <span class="currency-code">${c.code}</span>
+          <div class="figure">
+            <span class="label">Owed to you</span>
+            <span class="value positive">${fmtMoney(t.theyOweMe, c.code)}</span>
+          </div>
+          <div class="figure">
+            <span class="label">You owe</span>
+            <span class="value negative">${fmtMoney(t.iOweThem, c.code)}</span>
+          </div>
+          <div class="figure">
+            <span class="label">Net</span>
+            <span class="value ${balanceClass(net)}">${net >= 0 ? '+' : '-'}${fmtMoney(net, c.code)}</span>
+          </div>
+        </div>
+      `;
+    }).join('');
   }
 
   function renderPeopleList() {
@@ -140,13 +178,20 @@
       return;
     }
     for (const p of sorted) {
-      const bal = personBalance(p);
+      const balances = personBalancesByCurrency(p);
+      const used = currenciesUsed(p);
       const li = document.createElement('li');
       li.className = 'person-item' + (p.id === state.selectedPersonId ? ' active' : '');
       li.dataset.id = p.id;
+      const balanceLines = used.length === 0
+        ? '<span class="balance zero">No entries</span>'
+        : used.map(c => {
+            const bal = balances[c.code] || 0;
+            return `<span class="balance ${balanceClass(bal)}">${bal >= 0 ? '+' : '-'}${fmtMoney(bal, c.code)}</span>`;
+          }).join('');
       li.innerHTML = `
         <span class="name">${escapeHtml(p.name)}</span>
-        <span class="balance ${balanceClass(bal)}">${bal >= 0 ? '+' : '-'}$${fmtMoney(bal)}</span>
+        <span class="balance-stack">${balanceLines}</span>
       `;
       li.addEventListener('click', () => {
         state.selectedPersonId = p.id;
@@ -167,18 +212,24 @@
     el.detailContent.classList.remove('hidden');
     el.detailName.textContent = person.name;
 
-    const bal = personBalance(person);
-    el.balanceBox.innerHTML = `<span class="amount ${balanceClass(bal)}">${balanceText(bal, person.name)}</span>`;
+    const balances = personBalancesByCurrency(person);
+    const used = currenciesUsed(person);
+    el.balanceBox.innerHTML = used.length === 0
+      ? `<span class="amount zero">No history yet.</span>`
+      : used.map(c => {
+          const bal = balances[c.code] || 0;
+          return `<div class="amount ${balanceClass(bal)}">${balanceText(bal, c.code, person.name)}</div>`;
+        }).join('');
 
-    // history, most recent first, with running balance computed chronologically
+    // history, most recent first, with running balance computed chronologically per currency
     const sortedAsc = [...person.entries].sort((a, b) => {
       if (a.date !== b.date) return a.date < b.date ? -1 : 1;
       return a.id < b.id ? -1 : 1;
     });
-    let running = 0;
+    const runningByCurrency = {};
     const rows = sortedAsc.map(entry => {
-      running += entryDelta(entry);
-      return { entry, running };
+      runningByCurrency[entry.currency] = (runningByCurrency[entry.currency] || 0) + entryDelta(entry);
+      return { entry, running: runningByCurrency[entry.currency] };
     });
     rows.reverse();
 
@@ -195,8 +246,8 @@
         tr.innerHTML = `
           <td>${entry.date}</td>
           <td>${desc}${entry.note ? ` &mdash; <span class="muted">${escapeHtml(entry.note)}</span>` : ''}</td>
-          <td class="num amount ${delta >= 0 ? 'positive' : 'negative'}">${delta >= 0 ? '+' : '-'}$${fmtMoney(delta)}</td>
-          <td class="num amount ${balanceClass(running)}">${running >= 0 ? '+' : '-'}$${fmtMoney(running)}</td>
+          <td class="num amount ${delta >= 0 ? 'positive' : 'negative'}">${delta >= 0 ? '+' : '-'}${fmtMoney(delta, entry.currency)}</td>
+          <td class="num amount ${balanceClass(running)}">${running >= 0 ? '+' : '-'}${fmtMoney(running, entry.currency)}</td>
           <td><button class="delete-entry" title="Delete entry" data-entry-id="${entry.id}">&times;</button></td>
         `;
         el.historyBody.appendChild(tr);
@@ -303,6 +354,7 @@
     const kind = document.querySelector('input[name="entry-kind"]:checked').value;
     const direction = el.entryDirection.value;
     const amount = parseFloat(el.entryAmount.value);
+    const currency = el.entryCurrency.value;
     const note = el.entryNote.value.trim();
     const date = el.entryDate.value || todayStr();
 
@@ -311,7 +363,7 @@
       return;
     }
 
-    person.entries.push({ id: uid(), date, kind, direction, amount, note });
+    person.entries.push({ id: uid(), date, kind, direction, amount, currency, note });
     saveData();
 
     el.entryAmount.value = '';
@@ -321,6 +373,7 @@
 
   // ---- init ----
   el.entryDate.value = todayStr();
+  el.entryCurrency.innerHTML = CURRENCIES.map(c => `<option value="${c.code}">${c.label}</option>`).join('');
   updateDirectionOptions();
   render();
 })();
