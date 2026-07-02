@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Debt Track</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1>Debt Track</h1>
+    <div class="summary" id="summary"></div>
+  </header>
+
+  <main>
+    <section class="panel" id="people-panel">
+      <div class="panel-header">
+        <h2>People</h2>
+        <button id="add-person-btn" class="btn primary">+ Add Person</button>
+      </div>
+      <ul id="people-list" class="people-list"></ul>
+    </section>
+
+    <section class="panel" id="detail-panel">
+      <div id="detail-empty" class="empty-state">
+        <p>Select a person to see their debt history, or add someone new.</p>
+      </div>
+
+      <div id="detail-content" class="hidden">
+        <div class="panel-header">
+          <h2 id="detail-name"></h2>
+          <div class="detail-actions">
+            <button id="rename-btn" class="btn">Rename</button>
+            <button id="delete-person-btn" class="btn danger">Delete</button>
+          </div>
+        </div>
+
+        <div class="balance-box" id="balance-box"></div>
+
+        <div class="add-entry-form">
+          <div class="form-row">
+            <label>
+              <input type="radio" name="entry-kind" value="debt" checked>
+              New debt
+            </label>
+            <label>
+              <input type="radio" name="entry-kind" value="payment">
+              Payment
+            </label>
+          </div>
+          <div class="form-row">
+            <select id="entry-direction"></select>
+            <input type="number" id="entry-amount" placeholder="Amount" min="0.01" step="0.01">
+          </div>
+          <div class="form-row">
+            <input type="text" id="entry-note" placeholder="Note (optional)">
+            <input type="date" id="entry-date">
+          </div>
+          <div class="form-row">
+            <button id="add-entry-btn" class="btn primary">Add</button>
+          </div>
+        </div>
+
+        <h3>History</h3>
+        <table class="history-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Description</th>
+              <th class="num">Amount</th>
+              <th class="num">Balance</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="history-body"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <div id="modal-overlay" class="modal-overlay hidden">
+    <div class="modal">
+      <h3 id="modal-title">Add Person</h3>
+      <input type="text" id="modal-input" placeholder="Name">
+      <div class="modal-actions">
+        <button id="modal-cancel-btn" class="btn">Cancel</button>
+        <button id="modal-ok-btn" class="btn primary">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
