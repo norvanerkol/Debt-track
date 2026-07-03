@@ -27,7 +27,8 @@ No build step or install needed. Either:
 
 All data is stored in your browser's `localStorage` — nothing leaves your
 machine, and there's no account or server involved. Clearing your browser
-storage for this page will erase the data.
+storage for this page will erase the data. Currencies supported: USD ($),
+EUR (€), TRY (₺), tracked independently per person.
 
 ## Installing it as an app
 
