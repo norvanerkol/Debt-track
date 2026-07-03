@@ -24,6 +24,10 @@ No build step or install needed. Either:
   means they owe you, negative means you owe them.
 - **History**: every entry is kept with its date, note, amount, and the
   running balance at that point, and can be deleted individually.
+- **Group Expense**: a separate tab for splitting a bill — add people,
+  enter each person's share and what they actually paid, and see the
+  minimal set of who-pays-whom settlements. Independent from the main
+  debt ledger.
 
 All data is stored in your browser's `localStorage` — nothing leaves your
 machine, and there's no account or server involved. Clearing your browser
