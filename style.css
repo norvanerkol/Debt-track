@@ -53,6 +53,12 @@ body {
   margin: 0;
 }
 
+.lang-toggle {
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  padding: 0.4rem 0.6rem;
+}
+
 .summary {
   display: flex;
   flex-wrap: wrap;

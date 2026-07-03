@@ -1,5 +1,6 @@
 (() => {
   const STORAGE_KEY = 'debt-track:data';
+  const LANG_KEY = 'debt-track:lang';
 
   const CURRENCIES = [
     { code: 'USD', symbol: '$', label: 'USD ($)' },
@@ -8,6 +9,114 @@
   ];
   const DEFAULT_CURRENCY = CURRENCIES[0].code;
   const CURRENCY_SYMBOL = Object.fromEntries(CURRENCIES.map(c => [c.code, c.symbol]));
+
+  const TRANSLATIONS = {
+    en: {
+      people: 'People',
+      addPerson: '+ Add Person',
+      selectPersonHint: 'Select a person to see their debt history, or add someone new.',
+      rename: 'Rename',
+      delete: 'Delete',
+      newDebt: 'New debt',
+      payment: 'Payment',
+      amount: 'Amount',
+      noteOptional: 'Note (optional)',
+      add: 'Add',
+      history: 'History',
+      date: 'Date',
+      description: 'Description',
+      balance: 'Balance',
+      name: 'Name',
+      cancel: 'Cancel',
+      save: 'Save',
+      addPersonTitle: 'Add Person',
+      renamePersonTitle: 'Rename Person',
+      theyOweMe: 'They owe me',
+      iOweThem: 'I owe them',
+      theyPaidMeBack: 'They paid me back',
+      iPaidThemBack: 'I paid them back',
+      owedToYou: 'Owed to you',
+      youOwe: 'You owe',
+      net: 'Net',
+      noDebtsYet: 'No debts tracked yet',
+      noOneYet: 'No one yet. Add a person to get started.',
+      noEntries: 'No entries',
+      noHistoryYet: 'No history yet.',
+      noEntriesYet: 'No entries yet.',
+      settledUpIn: 'Settled up in {currency}',
+      theyOweYouAmount: '{name} owes you {amount}',
+      youOweAmount: 'You owe {name} {amount}',
+      newDebtTheyOwe: 'New debt: {name} owes you',
+      newDebtYouOwe: 'New debt: you owe {name}',
+      paymentTheyPaid: 'Payment: {name} paid you back',
+      paymentYouPaid: 'Payment: you paid {name} back',
+      confirmDeletePerson: "Delete {name} and all their history? This can't be undone.",
+      enterAmountAlert: 'Enter an amount greater than 0.',
+      langToggle: 'TR',
+    },
+    tr: {
+      people: 'Kişiler',
+      addPerson: '+ Kişi Ekle',
+      selectPersonHint: 'Borç geçmişini görmek için bir kişi seçin, ya da yeni biri ekleyin.',
+      rename: 'Yeniden Adlandır',
+      delete: 'Sil',
+      newDebt: 'Yeni borç',
+      payment: 'Ödeme',
+      amount: 'Tutar',
+      noteOptional: 'Not (isteğe bağlı)',
+      add: 'Ekle',
+      history: 'Geçmiş',
+      date: 'Tarih',
+      description: 'Açıklama',
+      balance: 'Bakiye',
+      name: 'İsim',
+      cancel: 'İptal',
+      save: 'Kaydet',
+      addPersonTitle: 'Kişi Ekle',
+      renamePersonTitle: 'Kişiyi Yeniden Adlandır',
+      theyOweMe: 'Bana borçlu',
+      iOweThem: 'Ona borçluyum',
+      theyPaidMeBack: 'Bana geri ödedi',
+      iPaidThemBack: 'Ona geri ödedim',
+      owedToYou: 'Sana borçlu',
+      youOwe: 'Senin borcun',
+      net: 'Net',
+      noDebtsYet: 'Henüz borç kaydı yok',
+      noOneYet: 'Henüz kimse yok. Başlamak için bir kişi ekleyin.',
+      noEntries: 'Kayıt yok',
+      noHistoryYet: 'Henüz geçmiş yok.',
+      noEntriesYet: 'Henüz kayıt yok.',
+      settledUpIn: '{currency} cinsinden ödeşildi',
+      theyOweYouAmount: '{name} sana {amount} borçlu',
+      youOweAmount: '{name} kişisine {amount} borçlusun',
+      newDebtTheyOwe: 'Yeni borç: {name} sana borçlandı',
+      newDebtYouOwe: 'Yeni borç: {name} kişisine borçlandın',
+      paymentTheyPaid: 'Ödeme: {name} sana geri ödedi',
+      paymentYouPaid: 'Ödeme: {name} kişisine geri ödedin',
+      confirmDeletePerson: '{name} ve tüm geçmişi silinsin mi? Bu işlem geri alınamaz.',
+      enterAmountAlert: "0'dan büyük bir tutar girin.",
+      langToggle: 'EN',
+    },
+  };
+
+  function getLang() {
+    return localStorage.getItem(LANG_KEY) === 'tr' ? 'tr' : 'en';
+  }
+
+  function setLang(lang) {
+    localStorage.setItem(LANG_KEY, lang);
+  }
+
+  function t(key, vars) {
+    const lang = getLang();
+    let str = (TRANSLATIONS[lang] && TRANSLATIONS[lang][key]) || TRANSLATIONS.en[key] || key;
+    if (vars) {
+      for (const [k, v] of Object.entries(vars)) {
+        str = str.replace(`{${k}}`, v);
+      }
+    }
+    return str;
+  }
 
   /** @typedef {{id:string,date:string,kind:'debt'|'payment',direction:'they_owe_me'|'i_owe_them',amount:number,currency:string,note:string}} Entry */
   /** @typedef {{id:string,name:string,entries:Entry[]}} Person */
@@ -74,9 +183,10 @@
   }
 
   function balanceText(n, currency, who) {
-    if (Math.abs(n) < 0.005) return `Settled up in ${currency}`;
-    if (n > 0) return `${who} owes you ${fmtMoney(n, currency)}`;
-    return `You owe ${who} ${fmtMoney(n, currency)}`;
+    const safeWho = escapeHtml(who);
+    if (Math.abs(n) < 0.005) return t('settledUpIn', { currency });
+    if (n > 0) return t('theyOweYouAmount', { name: safeWho, amount: fmtMoney(n, currency) });
+    return t('youOweAmount', { name: safeWho, amount: fmtMoney(n, currency) });
   }
 
   const state = {
@@ -107,22 +217,34 @@
     modalInput: document.getElementById('modal-input'),
     modalCancelBtn: document.getElementById('modal-cancel-btn'),
     modalOkBtn: document.getElementById('modal-ok-btn'),
+    langToggle: document.getElementById('lang-toggle'),
   };
 
   function getSelectedPerson() {
     return state.data.people.find(p => p.id === state.selectedPersonId) || null;
   }
 
+  function applyStaticTranslations() {
+    document.documentElement.lang = getLang();
+    document.querySelectorAll('[data-i18n]').forEach(elem => {
+      elem.textContent = t(elem.dataset.i18n);
+    });
+    document.querySelectorAll('[data-i18n-placeholder]').forEach(elem => {
+      elem.placeholder = t(elem.dataset.i18nPlaceholder);
+    });
+    el.langToggle.textContent = t('langToggle');
+  }
+
   function updateDirectionOptions() {
     const kind = document.querySelector('input[name="entry-kind"]:checked').value;
     const options = kind === 'debt'
       ? [
-          { value: 'they_owe_me', label: 'They owe me' },
-          { value: 'i_owe_them', label: 'I owe them' },
+          { value: 'they_owe_me', label: t('theyOweMe') },
+          { value: 'i_owe_them', label: t('iOweThem') },
         ]
       : [
-          { value: 'they_owe_me', label: 'They paid me back' },
-          { value: 'i_owe_them', label: 'I paid them back' },
+          { value: 'they_owe_me', label: t('theyPaidMeBack') },
+          { value: 'i_owe_them', label: t('iPaidThemBack') },
         ];
     el.entryDirection.innerHTML = options
       .map(o => `<option value="${o.value}">${o.label}</option>`)
@@ -134,32 +256,32 @@
     for (const p of state.data.people) {
       const balances = personBalancesByCurrency(p);
       for (const [currency, bal] of Object.entries(balances)) {
-        const t = totals[currency] || (totals[currency] = { theyOweMe: 0, iOweThem: 0 });
-        if (bal > 0) t.theyOweMe += bal;
-        else t.iOweThem += -bal;
+        const tot = totals[currency] || (totals[currency] = { theyOweMe: 0, iOweThem: 0 });
+        if (bal > 0) tot.theyOweMe += bal;
+        else tot.iOweThem += -bal;
       }
     }
     const usedCurrencies = CURRENCIES.filter(c => totals[c.code]);
     if (usedCurrencies.length === 0) {
-      el.summary.innerHTML = `<div class="figure"><span class="label">No debts tracked yet</span></div>`;
+      el.summary.innerHTML = `<div class="figure"><span class="label">${t('noDebtsYet')}</span></div>`;
       return;
     }
     el.summary.innerHTML = usedCurrencies.map(c => {
-      const t = totals[c.code];
-      const net = t.theyOweMe - t.iOweThem;
+      const tot = totals[c.code];
+      const net = tot.theyOweMe - tot.iOweThem;
       return `
         <div class="currency-group">
           <span class="currency-code">${c.code}</span>
           <div class="figure">
-            <span class="label">Owed to you</span>
-            <span class="value positive">${fmtMoney(t.theyOweMe, c.code)}</span>
+            <span class="label">${t('owedToYou')}</span>
+            <span class="value positive">${fmtMoney(tot.theyOweMe, c.code)}</span>
           </div>
           <div class="figure">
-            <span class="label">You owe</span>
-            <span class="value negative">${fmtMoney(t.iOweThem, c.code)}</span>
+            <span class="label">${t('youOwe')}</span>
+            <span class="value negative">${fmtMoney(tot.iOweThem, c.code)}</span>
           </div>
           <div class="figure">
-            <span class="label">Net</span>
+            <span class="label">${t('net')}</span>
             <span class="value ${balanceClass(net)}">${net >= 0 ? '+' : '-'}${fmtMoney(net, c.code)}</span>
           </div>
         </div>
@@ -173,7 +295,7 @@
     if (sorted.length === 0) {
       const li = document.createElement('li');
       li.className = 'empty-state';
-      li.textContent = 'No one yet. Add a person to get started.';
+      li.textContent = t('noOneYet');
       el.peopleList.appendChild(li);
       return;
     }
@@ -184,7 +306,7 @@
       li.className = 'person-item' + (p.id === state.selectedPersonId ? ' active' : '');
       li.dataset.id = p.id;
       const balanceLines = used.length === 0
-        ? '<span class="balance zero">No entries</span>'
+        ? `<span class="balance zero">${t('noEntries')}</span>`
         : used.map(c => {
             const bal = balances[c.code] || 0;
             return `<span class="balance ${balanceClass(bal)}">${bal >= 0 ? '+' : '-'}${fmtMoney(bal, c.code)}</span>`;
@@ -215,7 +337,7 @@
     const balances = personBalancesByCurrency(person);
     const used = currenciesUsed(person);
     el.balanceBox.innerHTML = used.length === 0
-      ? `<span class="amount zero">No history yet.</span>`
+      ? `<span class="amount zero">${t('noHistoryYet')}</span>`
       : used.map(c => {
           const bal = balances[c.code] || 0;
           return `<div class="amount ${balanceClass(bal)}">${balanceText(bal, c.code, person.name)}</div>`;
@@ -236,7 +358,7 @@
     el.historyBody.innerHTML = '';
     if (rows.length === 0) {
       const tr = document.createElement('tr');
-      tr.innerHTML = `<td colspan="5" class="empty-state">No entries yet.</td>`;
+      tr.innerHTML = `<td colspan="5" class="empty-state">${t('noEntriesYet')}</td>`;
       el.historyBody.appendChild(tr);
     } else {
       for (const { entry, running } of rows) {
@@ -265,14 +387,15 @@
   }
 
   function describeEntry(entry, name) {
+    const safeName = escapeHtml(name);
     if (entry.kind === 'debt') {
       return entry.direction === 'they_owe_me'
-        ? `New debt: ${escapeHtml(name)} owes you`
-        : `New debt: you owe ${escapeHtml(name)}`;
+        ? t('newDebtTheyOwe', { name: safeName })
+        : t('newDebtYouOwe', { name: safeName });
     }
     return entry.direction === 'they_owe_me'
-      ? `Payment: ${escapeHtml(name)} paid you back`
-      : `Payment: you paid ${escapeHtml(name)} back`;
+      ? t('paymentTheyPaid', { name: safeName })
+      : t('paymentYouPaid', { name: safeName });
   }
 
   function escapeHtml(str) {
@@ -315,7 +438,7 @@
 
   // ---- event wiring ----
   el.addPersonBtn.addEventListener('click', async () => {
-    const name = await openModal('Add Person', '');
+    const name = await openModal(t('addPersonTitle'), '');
     if (!name) return;
     const person = { id: uid(), name, entries: [] };
     state.data.people.push(person);
@@ -327,7 +450,7 @@
   el.renameBtn.addEventListener('click', async () => {
     const person = getSelectedPerson();
     if (!person) return;
-    const name = await openModal('Rename Person', person.name);
+    const name = await openModal(t('renamePersonTitle'), person.name);
     if (!name) return;
     person.name = name;
     saveData();
@@ -337,10 +460,17 @@
   el.deletePersonBtn.addEventListener('click', () => {
     const person = getSelectedPerson();
     if (!person) return;
-    if (!confirm(`Delete ${person.name} and all their history? This can't be undone.`)) return;
+    if (!confirm(t('confirmDeletePerson', { name: person.name }))) return;
     state.data.people = state.data.people.filter(p => p.id !== person.id);
     state.selectedPersonId = null;
     saveData();
+    render();
+  });
+
+  el.langToggle.addEventListener('click', () => {
+    setLang(getLang() === 'tr' ? 'en' : 'tr');
+    applyStaticTranslations();
+    updateDirectionOptions();
     render();
   });
 
@@ -359,7 +489,7 @@
     const date = el.entryDate.value || todayStr();
 
     if (!amount || amount <= 0) {
-      alert('Enter an amount greater than 0.');
+      alert(t('enterAmountAlert'));
       return;
     }
 
@@ -374,6 +504,7 @@
   // ---- init ----
   el.entryDate.value = todayStr();
   el.entryCurrency.innerHTML = CURRENCIES.map(c => `<option value="${c.code}">${c.label}</option>`).join('');
+  applyStaticTranslations();
   updateDirectionOptions();
   render();
 })();
