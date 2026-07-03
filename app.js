@@ -53,6 +53,20 @@
       confirmDeletePerson: "Delete {name} and all their history? This can't be undone.",
       enterAmountAlert: 'Enter an amount greater than 0.',
       langToggle: 'TR',
+      debtsTab: 'Debts',
+      groupExpenseTab: 'Group Expense',
+      groupExpenseHint: "Add people, enter each person's share of the bill and what they actually paid, and see who owes whom.",
+      currency: 'Currency',
+      share: 'Share',
+      paid: 'Paid',
+      reset: 'Reset',
+      confirmResetGroup: 'Clear this group expense and start over?',
+      noParticipantsYet: 'Add people to split a bill.',
+      settlementHeading: 'Who pays whom',
+      allSettled: 'Everyone is settled up.',
+      settlementLine: '{from} pays {to} {amount}',
+      totalShareLabel: 'Total bill',
+      totalPaidLabel: 'Total paid',
     },
     tr: {
       people: 'Kişiler',
@@ -96,6 +110,20 @@
       confirmDeletePerson: '{name} ve tüm geçmişi silinsin mi? Bu işlem geri alınamaz.',
       enterAmountAlert: "0'dan büyük bir tutar girin.",
       langToggle: 'EN',
+      debtsTab: 'Borç Takibi',
+      groupExpenseTab: 'Grup Harcaması',
+      groupExpenseHint: 'Kişileri ekleyin, her kişinin hesaptaki payını ve gerçekte ne ödediğini girin; kimin kime borçlu olduğunu görün.',
+      currency: 'Para Birimi',
+      share: 'Payı',
+      paid: 'Ödediği',
+      reset: 'Sıfırla',
+      confirmResetGroup: 'Bu grup harcaması temizlensin ve yeniden mi başlansın?',
+      noParticipantsYet: 'Hesabı bölüştürmek için kişi ekleyin.',
+      settlementHeading: 'Kim Kime Ne Kadar Verecek',
+      allSettled: 'Herkes hesaplaştı.',
+      settlementLine: '{from}, {to} kişisine {amount} verecek',
+      totalShareLabel: 'Toplam Hesap',
+      totalPaidLabel: 'Toplam Ödenen',
     },
   };
 
@@ -140,6 +168,27 @@
 
   function saveData() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state.data));
+  }
+
+  const GROUP_STORAGE_KEY = 'debt-track:group-expense';
+
+  /** @typedef {{id:string,name:string,share:number,paid:number}} Participant */
+
+  function loadGroup() {
+    try {
+      const raw = localStorage.getItem(GROUP_STORAGE_KEY);
+      if (!raw) return { currency: DEFAULT_CURRENCY, participants: [] };
+      const parsed = JSON.parse(raw);
+      if (!parsed || !Array.isArray(parsed.participants)) return { currency: DEFAULT_CURRENCY, participants: [] };
+      if (!parsed.currency) parsed.currency = DEFAULT_CURRENCY;
+      return parsed;
+    } catch {
+      return { currency: DEFAULT_CURRENCY, participants: [] };
+    }
+  }
+
+  function saveGroup() {
+    localStorage.setItem(GROUP_STORAGE_KEY, JSON.stringify(state.group));
   }
 
   function uid() {
@@ -192,6 +241,8 @@
   const state = {
     data: loadData(),
     selectedPersonId: null,
+    group: loadGroup(),
+    activeTab: 'debts',
   };
 
   // ---- DOM refs ----
@@ -218,6 +269,16 @@
     modalCancelBtn: document.getElementById('modal-cancel-btn'),
     modalOkBtn: document.getElementById('modal-ok-btn'),
     langToggle: document.getElementById('lang-toggle'),
+    tabDebtsBtn: document.getElementById('tab-debts-btn'),
+    tabGroupBtn: document.getElementById('tab-group-btn'),
+    debtsView: document.getElementById('debts-view'),
+    groupView: document.getElementById('group-view'),
+    groupResetBtn: document.getElementById('group-reset-btn'),
+    groupCurrency: document.getElementById('group-currency'),
+    groupParticipantsBody: document.getElementById('group-participants-body'),
+    groupAddParticipantBtn: document.getElementById('group-add-participant-btn'),
+    groupTotals: document.getElementById('group-totals'),
+    groupSettlements: document.getElementById('group-settlements'),
   };
 
   function getSelectedPerson() {
@@ -410,6 +471,137 @@
     renderDetail();
   }
 
+  // ---- group expense (bill splitting) ----
+  function computeSettlements(balances) {
+    const creditors = balances
+      .filter(b => b.amount > 0.005)
+      .map(b => ({ ...b }))
+      .sort((a, b) => b.amount - a.amount);
+    const debtors = balances
+      .filter(b => b.amount < -0.005)
+      .map(b => ({ ...b, amount: -b.amount }))
+      .sort((a, b) => b.amount - a.amount);
+
+    const settlements = [];
+    let i = 0;
+    let j = 0;
+    while (i < debtors.length && j < creditors.length) {
+      const pay = Math.min(debtors[i].amount, creditors[j].amount);
+      settlements.push({ from: debtors[i].name, to: creditors[j].name, amount: pay });
+      debtors[i].amount -= pay;
+      creditors[j].amount -= pay;
+      if (debtors[i].amount < 0.005) i++;
+      if (creditors[j].amount < 0.005) j++;
+    }
+    return settlements;
+  }
+
+  function renderGroupParticipantRows() {
+    el.groupParticipantsBody.innerHTML = '';
+    if (state.group.participants.length === 0) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td colspan="5" class="empty-state">${t('noParticipantsYet')}</td>`;
+      el.groupParticipantsBody.appendChild(tr);
+      return;
+    }
+    for (const participant of state.group.participants) {
+      const tr = document.createElement('tr');
+      tr.dataset.id = participant.id;
+      tr.innerHTML = `
+        <td><input type="text" class="gname" value="${escapeHtml(participant.name)}"></td>
+        <td class="num"><input type="number" class="gshare" value="${participant.share}" min="0" step="0.01"></td>
+        <td class="num"><input type="number" class="gpaid" value="${participant.paid}" min="0" step="0.01"></td>
+        <td class="num gbalance"></td>
+        <td><button class="delete-entry" title="Delete" data-id="${participant.id}">&times;</button></td>
+      `;
+      const nameInput = tr.querySelector('.gname');
+      const shareInput = tr.querySelector('.gshare');
+      const paidInput = tr.querySelector('.gpaid');
+      nameInput.addEventListener('input', () => {
+        participant.name = nameInput.value;
+        saveGroup();
+        renderGroupComputed();
+      });
+      shareInput.addEventListener('input', () => {
+        participant.share = parseFloat(shareInput.value) || 0;
+        saveGroup();
+        renderGroupComputed();
+      });
+      paidInput.addEventListener('input', () => {
+        participant.paid = parseFloat(paidInput.value) || 0;
+        saveGroup();
+        renderGroupComputed();
+      });
+      tr.querySelector('.delete-entry').addEventListener('click', () => {
+        state.group.participants = state.group.participants.filter(p => p.id !== participant.id);
+        saveGroup();
+        renderGroupParticipantRows();
+        renderGroupComputed();
+      });
+      el.groupParticipantsBody.appendChild(tr);
+    }
+  }
+
+  function renderGroupComputed() {
+    const currency = state.group.currency;
+    const balances = state.group.participants.map(p => ({
+      id: p.id,
+      name: p.name || t('name'),
+      amount: p.paid - p.share,
+    }));
+
+    el.groupParticipantsBody.querySelectorAll('tr').forEach(tr => {
+      const id = tr.dataset.id;
+      const bal = balances.find(b => b.id === id);
+      const cell = tr.querySelector('.gbalance');
+      if (bal && cell) {
+        cell.textContent = `${bal.amount >= 0 ? '+' : '-'}${fmtMoney(bal.amount, currency)}`;
+        cell.className = `num gbalance ${balanceClass(bal.amount)}`;
+      }
+    });
+
+    const totalShare = state.group.participants.reduce((sum, p) => sum + p.share, 0);
+    const totalPaid = state.group.participants.reduce((sum, p) => sum + p.paid, 0);
+    el.groupTotals.innerHTML = `
+      <div class="figure">
+        <span class="label">${t('totalShareLabel')}</span>
+        <span class="value">${fmtMoney(totalShare, currency)}</span>
+      </div>
+      <div class="figure">
+        <span class="label">${t('totalPaidLabel')}</span>
+        <span class="value">${fmtMoney(totalPaid, currency)}</span>
+      </div>
+    `;
+
+    const settlements = computeSettlements(balances);
+    if (settlements.length === 0) {
+      el.groupSettlements.innerHTML = `<p class="empty-state">${t('allSettled')}</p>`;
+    } else {
+      el.groupSettlements.innerHTML = settlements.map(s => {
+        const line = t('settlementLine', {
+          from: escapeHtml(s.from || t('name')),
+          to: escapeHtml(s.to || t('name')),
+          amount: `<strong>${fmtMoney(s.amount, currency)}</strong>`,
+        });
+        return `<div class="settlement-row"><span>${line}</span></div>`;
+      }).join('');
+    }
+  }
+
+  function renderGroup() {
+    renderGroupParticipantRows();
+    renderGroupComputed();
+  }
+
+  function switchTab(tab) {
+    state.activeTab = tab;
+    el.tabDebtsBtn.classList.toggle('active', tab === 'debts');
+    el.tabGroupBtn.classList.toggle('active', tab === 'group');
+    el.debtsView.classList.toggle('hidden', tab !== 'debts');
+    el.groupView.classList.toggle('hidden', tab !== 'group');
+    if (tab === 'group') renderGroup();
+  }
+
   // ---- modal helpers ----
   let modalResolve = null;
   function openModal(title, initialValue) {
@@ -472,6 +664,31 @@
     applyStaticTranslations();
     updateDirectionOptions();
     render();
+    if (state.activeTab === 'group') renderGroup();
+  });
+
+  el.tabDebtsBtn.addEventListener('click', () => switchTab('debts'));
+  el.tabGroupBtn.addEventListener('click', () => switchTab('group'));
+
+  el.groupAddParticipantBtn.addEventListener('click', () => {
+    state.group.participants.push({ id: uid(), name: '', share: 0, paid: 0 });
+    saveGroup();
+    renderGroupParticipantRows();
+    renderGroupComputed();
+  });
+
+  el.groupResetBtn.addEventListener('click', () => {
+    if (state.group.participants.length === 0) return;
+    if (!confirm(t('confirmResetGroup'))) return;
+    state.group = { currency: state.group.currency, participants: [] };
+    saveGroup();
+    renderGroup();
+  });
+
+  el.groupCurrency.addEventListener('change', () => {
+    state.group.currency = el.groupCurrency.value;
+    saveGroup();
+    renderGroupComputed();
   });
 
   document.querySelectorAll('input[name="entry-kind"]').forEach(radio => {
@@ -504,6 +721,8 @@
   // ---- init ----
   el.entryDate.value = todayStr();
   el.entryCurrency.innerHTML = CURRENCIES.map(c => `<option value="${c.code}">${c.label}</option>`).join('');
+  el.groupCurrency.innerHTML = CURRENCIES.map(c => `<option value="${c.code}">${c.label}</option>`).join('');
+  el.groupCurrency.value = state.group.currency;
   applyStaticTranslations();
   updateDirectionOptions();
   render();

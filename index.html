@@ -22,7 +22,12 @@
     <button id="lang-toggle" class="btn lang-toggle" type="button"></button>
   </header>
 
-  <main>
+  <nav class="tab-bar">
+    <button id="tab-debts-btn" class="tab-btn active" data-i18n="debtsTab" type="button">Debts</button>
+    <button id="tab-group-btn" class="tab-btn" data-i18n="groupExpenseTab" type="button">Group Expense</button>
+  </nav>
+
+  <main id="debts-view">
     <section class="panel" id="people-panel">
       <div class="panel-header">
         <h2 data-i18n="people">People</h2>
@@ -86,6 +91,43 @@
           <tbody id="history-body"></tbody>
         </table>
       </div>
+    </section>
+  </main>
+
+  <main id="group-view" class="hidden">
+    <section class="panel" id="group-panel">
+      <div class="panel-header">
+        <h2 data-i18n="groupExpenseTab">Group Expense</h2>
+        <button id="group-reset-btn" class="btn danger" data-i18n="reset">Reset</button>
+      </div>
+      <p class="empty-state group-hint" data-i18n="groupExpenseHint">Add people, enter each person's share of the bill and what they actually paid, and see who owes whom.</p>
+
+      <div class="form-row">
+        <label data-i18n="currency">Currency</label>
+        <select id="group-currency"></select>
+      </div>
+
+      <div class="group-table-wrap">
+        <table class="history-table group-table">
+          <thead>
+            <tr>
+              <th data-i18n="name">Name</th>
+              <th class="num" data-i18n="share">Share</th>
+              <th class="num" data-i18n="paid">Paid</th>
+              <th class="num" data-i18n="balance">Balance</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="group-participants-body"></tbody>
+        </table>
+      </div>
+
+      <button id="group-add-participant-btn" class="btn primary" data-i18n="addPerson">+ Add Person</button>
+
+      <div class="group-totals" id="group-totals"></div>
+
+      <h3 data-i18n="settlementHeading">Who pays whom</h3>
+      <div id="group-settlements"></div>
     </section>
   </main>
 
