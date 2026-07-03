@@ -14,6 +14,8 @@ No build step or install needed. Either:
 
 ## How it works
 
+- **Language**: toggle between English and Turkish with the EN/TR button in
+  the header; the choice is remembered.
 - **People**: add a person for anyone you owe or who owes you.
 - **Entries**: for each person, log either a new **debt** (they owe you, or
   you owe them) or a **payment** (they paid you back, or you paid them
