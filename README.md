@@ -35,4 +35,5 @@ EUR (€), TRY (₺), tracked independently per person.
 The app is also an installable PWA: once hosted (e.g. via GitHub Pages),
 open it in a mobile browser and use "Add to Home Screen." A service worker
 caches the app on first visit, so it keeps working with no internet
-afterward.
+afterward. After updating the app, open it once online and reload so the
+new service worker takes over before relying on it offline again.
