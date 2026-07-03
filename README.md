@@ -26,3 +26,10 @@ No build step or install needed. Either:
 All data is stored in your browser's `localStorage` — nothing leaves your
 machine, and there's no account or server involved. Clearing your browser
 storage for this page will erase the data.
+
+## Installing it as an app
+
+The app is also an installable PWA: once hosted (e.g. via GitHub Pages),
+open it in a mobile browser and use "Add to Home Screen." A service worker
+caches the app on first visit, so it keeps working with no internet
+afterward.
